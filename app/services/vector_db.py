@@ -57,18 +57,27 @@ def insert_embeddings(db_name, process_task_id, chunks, embeddings):
     """Insert embeddings into the specified database."""
     db = get_database(db_name)
     DocumentEmbedding.bind(db)
+    
+    logger.info(f"Database connection status: {not db.is_closed()}")
+    logger.info(f"Preparing to insert {len(chunks)} chunks with {len(embeddings)} embeddings")
 
-    with db.atomic():
-        data = [
-            {
-                'process_task_id': str(process_task_id),
-                'chunk_index': i,
-                'text_chunk': chunk,
-                'embedding': embedding.tolist() if isinstance(embedding, np.ndarray) else embedding
-            }
-            for i, (chunk, embedding) in enumerate(zip(chunks, embeddings))
-        ]
-        DocumentEmbedding.insert_many(data).execute()
+    try:
+        with db.atomic():
+            data = [
+                {
+                    'process_task_id': str(process_task_id),
+                    'chunk_index': i,
+                    'text_chunk': chunk,
+                    'embedding': embedding.tolist() if isinstance(embedding, np.ndarray) else embedding
+                }
+                for i, (chunk, embedding) in enumerate(zip(chunks, embeddings))
+            ]
+            result = DocumentEmbedding.insert_many(data).execute()
+            logger.info(f"Insert operation result: {result}")
+            logger.info(f"Successfully inserted {len(data)} records")
+    except Exception as e:
+        logger.error(f"Error during database insertion: {e}")
+        raise
 
 def search_similar(db_name, query_embedding, top_k=8):
     """Search for similar embeddings in the specified database."""
@@ -84,6 +93,15 @@ def search_similar(db_name, query_embedding, top_k=8):
 
     results = [row.text_chunk for row in query]
     return results
+
+def verify_insertion(db_name, process_task_id):
+    """Verify if data was inserted for the given process_task_id."""
+    db = get_database(db_name)
+    DocumentEmbedding.bind(db)
+    
+    count = DocumentEmbedding.select().where(DocumentEmbedding.process_task_id == str(process_task_id)).count()
+    logger.info(f"Found {count} records for process_task_id: {process_task_id}")
+    return count
 
 def close_all_connections():
     """Close all database connections."""

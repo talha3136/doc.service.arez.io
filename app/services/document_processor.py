@@ -6,7 +6,7 @@ import requests
 from PyPDF2 import PdfReader, PdfWriter
 from google.cloud import documentai
 from .ai_service import get_embeddings_from_gemini, chunk_text_divider
-from .vector_db import insert_embeddings, create_tables_for_db
+from .vector_db import insert_embeddings, create_tables_for_db, verify_insertion
 from flask import current_app
 import logging
 
@@ -35,8 +35,14 @@ def process_document_task(process_task_id: str, file_url: str, db_name: str):
         embeddings = get_embeddings_from_gemini(chunks)
 
         # Ensure table exists and store embeddings in specified database
+        logger.info(f"Creating tables for db: {db_name}")
         create_tables_for_db(db_name)
+        logger.info(f"Inserting {len(embeddings)} embeddings for task: {process_task_id}")
         insert_embeddings(db_name, process_task_id, chunks, embeddings)
+        
+        # Verify insertion
+        inserted_count = verify_insertion(db_name, process_task_id)
+        logger.info(f"Verification: {inserted_count} records found for task: {process_task_id}")
 
         result = {
             "text": extracted_text[:2000],  # Summary
