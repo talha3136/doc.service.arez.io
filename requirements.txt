@@ -1,0 +1,12 @@
+Flask-RESTful==0.3.10
+google-cloud-documentai==3.2.0
+grpcio-status==1.71.2
+marshmallow==3.20.1
+peewee==3.17.1
+pgvector==0.2.4
+pip==24.0
+psycopg2-binary==2.9.9
+PyPDF2==3.0.1
+python-decouple==3.8
+SQLAlchemy==2.0.23
+vertexai==1.71.1
