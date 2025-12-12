@@ -27,28 +27,40 @@ def process_document_task(process_task_id: str, file_url: str, db_name: str):
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
 
-        # Process with Document AI
-        extracted_text = extract_text_with_docai(local_file_path)
+        # Check number of pages
+        reader = PdfReader(local_file_path)
+        num_pages = len(reader.pages)
 
-        # Create embeddings
-        chunks = chunk_text_divider(extracted_text, max_chars=2000, overlap=200)
-        embeddings = get_embeddings_from_gemini(chunks)
+        if num_pages <= 10:
+            # Process as single document
+            result = process_single_pdf(process_task_id, local_file_path, db_name)
+        else:
+            # Split into chunks of 10 pages
+            results = []
+            for start_page in range(0, num_pages, 10):
+                end_page = min(start_page + 10, num_pages)
+                sub_file_path = os.path.join(temp_dir, f"chunk_{start_page}_{end_page}.pdf")
 
-        # Ensure table exists and store embeddings in specified database
-        logger.info(f"Creating tables for db: {db_name}")
-        create_tables_for_db(db_name)
-        logger.info(f"Inserting {len(embeddings)} embeddings for task: {process_task_id}")
-        insert_embeddings(db_name, process_task_id, chunks, embeddings)
-        
-        # Verify insertion
-        inserted_count = verify_insertion(db_name, process_task_id)
-        logger.info(f"Verification: {inserted_count} records found for task: {process_task_id}")
+                # Create sub-PDF
+                writer = PdfWriter()
+                for page_num in range(start_page, end_page):
+                    writer.add_page(reader.pages[page_num])
+                with open(sub_file_path, 'wb') as f:
+                    writer.write(f)
 
-        result = {
-            "text": extracted_text[:2000],  # Summary
-            "chunks_created": len(chunks),
-            "embeddings_created": len(embeddings)
-        }
+                # Process chunk
+                chunk_result = process_single_pdf(process_task_id, sub_file_path, db_name)
+                results.append(chunk_result)
+
+            # Aggregate results
+            total_chunks = sum(r["chunks_created"] for r in results)
+            total_embeddings = sum(r["embeddings_created"] for r in results)
+            combined_text = " ".join(r["text"] for r in results)[:2000]
+            result = {
+                "text": combined_text,
+                "chunks_created": total_chunks,
+                "embeddings_created": total_embeddings
+            }
 
         return result
 
@@ -58,6 +70,31 @@ def process_document_task(process_task_id: str, file_url: str, db_name: str):
     finally:
         if temp_dir and os.path.exists(temp_dir):
             shutil.rmtree(temp_dir, ignore_errors=True)
+
+def process_single_pdf(process_task_id: str, file_path: str, db_name: str):
+    """Process a single PDF file."""
+    # Process with Document AI
+    extracted_text = extract_text_with_docai(file_path)
+
+    # Create embeddings
+    chunks = chunk_text_divider(extracted_text, max_chars=2000, overlap=200)
+    embeddings = get_embeddings_from_gemini(chunks)
+
+    # Ensure table exists and store embeddings in specified database
+    logger.info(f"Creating tables for db: {db_name}")
+    create_tables_for_db(db_name)
+    logger.info(f"Inserting {len(embeddings)} embeddings for task: {process_task_id}")
+    insert_embeddings(db_name, process_task_id, chunks, embeddings)
+
+    # Verify insertion
+    inserted_count = verify_insertion(db_name, process_task_id)
+    logger.info(f"Verification: {inserted_count} records found for task: {process_task_id}")
+
+    return {
+        "text": extracted_text[:2000],  # Summary
+        "chunks_created": len(chunks),
+        "embeddings_created": len(embeddings)
+    }
 
 def extract_text_with_docai(file_path: str) -> str:
     """Extract text using Google Document AI."""
