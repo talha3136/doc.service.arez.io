@@ -13,13 +13,14 @@ def query():
 
         query_text = json_data.get('query')
         db_name = json_data.get('db_name', 'default')
+        company_id = json_data.get('company_id')
 
         if not query_text:
             return jsonify({'error': 'Missing required field: query'}), 400
         if not db_name:
             return jsonify({'error': 'Missing required field: db_name'}), 400
 
-        context = search_similar_chunks(query_text, db_name)
+        context = search_similar_chunks(query_text, db_name, company_id=company_id)
 
         prompt = f"""
         You are an AI assistant trained on the Arez Customer Support Manual.
@@ -51,13 +52,14 @@ def process_document():
         process_task_id = json_data.get('process_task_id')
         file_url = json_data.get('file_url')
         db_name = json_data.get('db_name', 'default')
+        company = json_data.get('company')
 
         if not process_task_id:
             return jsonify({'error': 'Missing required field: process_task_id'}), 400
         if not file_url:
             return jsonify({'error': 'Missing required field: file_url'}), 400
 
-        task = process_document_task.delay(process_task_id, file_url, db_name)
+        task = process_document_task.delay(process_task_id, file_url, db_name, company)
 
         return jsonify({
             'status': 'processing',

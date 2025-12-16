@@ -37,6 +37,7 @@ class DocumentEmbedding(BaseModel):
     text_chunk = pw.TextField()
     embedding = VectorField(dimensions=768)
     data = pw.TextField(null=True)
+    company = pw.TextField(null=True)
 
     class Meta:
         table_name = 'document_embeddings'
@@ -53,11 +54,11 @@ def create_tables_for_db(db_name):
     db.execute_sql("DROP INDEX IF EXISTS documentembedding_embedding;")
     db.execute_sql("CREATE INDEX IF NOT EXISTS documentembedding_embedding_idx ON document_embeddings USING hnsw (embedding vector_cosine_ops);")
 
-def insert_embeddings(db_name, process_task_id, chunks, embeddings):
+def insert_embeddings(db_name, process_task_id, chunks, embeddings, company=None):
     """Insert embeddings into the specified database."""
     db = get_database(db_name)
     DocumentEmbedding.bind(db)
-    
+
     logger.info(f"Database connection status: {not db.is_closed()}")
     logger.info(f"Preparing to insert {len(chunks)} chunks with {len(embeddings)} embeddings")
 
@@ -68,7 +69,8 @@ def insert_embeddings(db_name, process_task_id, chunks, embeddings):
                     'process_task_id': str(process_task_id),
                     'chunk_index': i,
                     'text_chunk': chunk,
-                    'embedding': embedding.tolist() if isinstance(embedding, np.ndarray) else embedding
+                    'embedding': embedding.tolist() if isinstance(embedding, np.ndarray) else embedding,
+                    'company': company
                 }
                 for i, (chunk, embedding) in enumerate(zip(chunks, embeddings))
             ]
@@ -79,17 +81,19 @@ def insert_embeddings(db_name, process_task_id, chunks, embeddings):
         logger.error(f"Error during database insertion: {e}")
         raise
 
-def search_similar(db_name, query_embedding, top_k=8):
+def search_similar(db_name, query_embedding, top_k=8, company_id=None):
     """Search for similar embeddings in the specified database."""
     db = get_database(db_name)
     DocumentEmbedding.bind(db)
 
     embedding_vector = query_embedding.tolist() if isinstance(query_embedding, np.ndarray) else query_embedding
 
-    query = (DocumentEmbedding
-             .select(DocumentEmbedding.text_chunk)
-             .order_by(DocumentEmbedding.embedding.cosine_distance(embedding_vector))
-             .limit(top_k))
+    query = DocumentEmbedding.select(DocumentEmbedding.text_chunk).order_by(DocumentEmbedding.embedding.cosine_distance(embedding_vector))
+
+    if company_id:
+        query = query.where(DocumentEmbedding.company == company_id)
+
+    query = query.limit(top_k)
 
     results = [row.text_chunk for row in query]
     return results

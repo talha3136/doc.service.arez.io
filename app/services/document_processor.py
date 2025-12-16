@@ -14,7 +14,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 @shared_task(ignore_result=False, autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 3})
-def process_document_task(process_task_id: str, file_url: str, db_name: str):
+def process_document_task(process_task_id: str, file_url: str, db_name: str, company: str = None):
     """Process document and create embeddings."""
     temp_dir = None
     try:
@@ -35,7 +35,7 @@ def process_document_task(process_task_id: str, file_url: str, db_name: str):
 
         if num_pages <= 10:
             # Process as single document
-            result = process_single_pdf(process_task_id, local_file_path, db_name)
+            result = process_single_pdf(process_task_id, local_file_path, db_name, company)
         else:
             # Split into chunks of 10 pages
             results = []
@@ -51,7 +51,7 @@ def process_document_task(process_task_id: str, file_url: str, db_name: str):
                     writer.write(f)
 
                 # Process chunk
-                chunk_result = process_single_pdf(process_task_id, sub_file_path, db_name)
+                chunk_result = process_single_pdf(process_task_id, sub_file_path, db_name, company)
                 results.append(chunk_result)
 
             # Aggregate results
@@ -73,7 +73,7 @@ def process_document_task(process_task_id: str, file_url: str, db_name: str):
         if temp_dir and os.path.exists(temp_dir):
             shutil.rmtree(temp_dir, ignore_errors=True)
 
-def process_single_pdf(process_task_id: str, file_path: str, db_name: str):
+def process_single_pdf(process_task_id: str, file_path: str, db_name: str, company: str = None):
     """Process a single PDF file."""
     # Process with Document AI
     extracted_text = extract_text_with_docai(file_path)
@@ -86,7 +86,7 @@ def process_single_pdf(process_task_id: str, file_path: str, db_name: str):
     logger.info(f"Creating tables for db: {db_name}")
     create_tables_for_db(db_name)
     logger.info(f"Inserting {len(embeddings)} embeddings for task: {process_task_id}")
-    insert_embeddings(db_name, process_task_id, chunks, embeddings)
+    insert_embeddings(db_name, process_task_id, chunks, embeddings, company)
 
     # Verify insertion
     inserted_count = verify_insertion(db_name, process_task_id)

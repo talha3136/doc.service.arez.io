@@ -7,14 +7,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def search_similar_chunks(query_text: str, db_name: str, top_k=8):
+def search_similar_chunks(query_text: str, db_name: str, top_k=8, company_id=None):
     """Retrieve the top-k most relevant text chunks for a query using embeddings."""
     try:
         # Generate embedding for query
         query_embedding = get_embeddings_from_gemini([query_text])[0]
 
         # Search in specified database
-        similar_chunks = search_similar(db_name, query_embedding, top_k)
+        similar_chunks = search_similar(db_name, query_embedding, top_k, company_id)
 
         # Combine chunks into context
         context = " ".join(similar_chunks)
