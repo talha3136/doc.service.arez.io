@@ -17,6 +17,10 @@ def create_app(config_name='default'):
     config_class = Config.get(config_name)
     app.config.from_object(config_class)
 
+    # Initialize Celery
+    from .celery_utils import celery_init_app
+    celery_init_app(app)
+
     # Initialize logging
     logging.basicConfig(level=logging.INFO)
     app.logger.setLevel(logging.INFO)

@@ -7,11 +7,13 @@ from PyPDF2 import PdfReader, PdfWriter
 from google.cloud import documentai
 from .ai_service import get_embeddings_from_gemini, chunk_text_divider
 from .vector_db import insert_embeddings, create_tables_for_db, verify_insertion
+from celery import shared_task
 from flask import current_app
 import logging
 
 logger = logging.getLogger(__name__)
 
+@shared_task(ignore_result=False, autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 3})
 def process_document_task(process_task_id: str, file_url: str, db_name: str):
     """Process document and create embeddings."""
     temp_dir = None

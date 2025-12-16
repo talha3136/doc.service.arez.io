@@ -10,6 +10,19 @@ class Config:
     DOCUMENT_AI_LOCATION = 'us'
     DOCUMENT_AI_PROCESSOR_ID = '7e847b8bcb99bac3'
 
+    # Celery Configuration
+    CELERY_BROKER_URL = 'redis://localhost:6379/0'
+    CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+    CELERY_TASK_TRACK_STARTED = True
+    CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
+    CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+    CELERY_TASK_ACKS_LATE = True
+    CELERY_WORKER_CONCURRENCY = 1
+    CELERY_TASK_DEFAULT_QUEUE = 'process_document'
+    CELERY_TASK_ROUTES = {
+        'app.services.document_processor.process_document_task': {'queue': 'process_document'}
+    }
+
     # Multiple vector databases configuration
     VECTOR_DATABASES = {
         'default': {

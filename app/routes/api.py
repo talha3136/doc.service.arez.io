@@ -57,12 +57,34 @@ def process_document():
         if not file_url:
             return jsonify({'error': 'Missing required field: file_url'}), 400
 
-        result = process_document_task(process_task_id, file_url, db_name)
+        task = process_document_task.delay(process_task_id, file_url, db_name)
 
         return jsonify({
-            'status': 'success',
-            'result': result
+            'status': 'processing',
+            'task_id': task.id,
+            'process_task_id': process_task_id
         })
 
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/task-status/<task_id>', methods=['GET'])
+def get_task_status(task_id):
+    try:
+        from celery.result import AsyncResult
+        task_result = AsyncResult(task_id)
+        
+        response = {
+            'task_id': task_id,
+            'status': task_result.status,
+            'result': task_result.result if task_result.ready() else None
+        }
+        
+        # If task failed, include error message
+        if task_result.status == 'FAILURE':
+            response['error'] = str(task_result.result)
+            
+        return jsonify(response)
     except Exception as e:
         return jsonify({'error': str(e)}), 500

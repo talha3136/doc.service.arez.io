@@ -11,3 +11,6 @@ PyPDF2==3.0.1
 python-decouple==3.8
 SQLAlchemy==2.0.23
 vertexai==1.71.1
+celery==5.3.6
+redis==5.0.1
+gunicorn==21.2.0
